@@ -22,7 +22,7 @@ import (
 )
 
 const SLEEPTIME = 2 * time.Minute
-const ITERATIONS = 1
+const ITERATIONS = 3
 
 type MachineConfig struct {
 	PartId         string `json:"part_id"`
