@@ -21,7 +21,7 @@ import (
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const SLEEPTIME = 60 * time.Second
+const SLEEPTIME = 2 * time.Minute
 
 type config struct {
 	RobotAPIName string `json:"robot_api_name"`
@@ -40,11 +40,23 @@ func main() {
 	}
 	logger.Infof("Loaded config file with secrets: %+v", Config)
 
+	for i := 0; i < 6; i++ {
+
+		err = DoAll(logger)
+		if err != nil {
+			logger.Error(err)
+		}
+
+		time.Sleep(SLEEPTIME + 30*time.Second)
+	}
+}
+
+func DoAll(logger *zap.SugaredLogger) error {
 	logger.Info("Connecting to 'smart' machine...")
 
 	robot, err := RobotClient(context.Background(), logger, 5)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 	defer robot.Close(context.Background())
 
@@ -52,17 +64,20 @@ func main() {
 
 	temp, err := ReadTemp(robot, 20, logger)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
 	logger.Infof("Temp: %v", temp)
 
 	err = SendData(context.Background(), map[string]interface{}{"temp": temp}, logger)
 	if err != nil {
-		logger.Fatal(err)
+		return err
 	}
 
+	// will hang
 	GoToSleep(robot, 30*time.Second, logger)
+
+	return nil
 }
 
 func ParseConfig() error {
