@@ -1,7 +1,10 @@
-Viam MicroRDK on an ESP32 with a TMP36 analog sensor.
-Read sensor push to app.viam.com.
+# Temperature Reading Client
 
-Sample machine config:
+## Description
+Viam MicroRDK on an ESP32 with a TMP36 analog sensor. Read sensor push to app.viam.com.
+
+## Configs
+Sample app.viam.com machine config:
 
 ```
 {
