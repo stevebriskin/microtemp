@@ -22,15 +22,23 @@ import (
 )
 
 const SLEEPTIME = 2 * time.Minute
+const ITERATIONS = 1
 
-type config struct {
-	RobotAPIName string `json:"robot_api_name"`
-	RobotAPIKey  string `json:"robot_api_key"`
-	AppAPIName   string `json:"app_api_name"`
-	AppAPIKey    string `json:"app_api_key"`
+type MachineConfig struct {
+	PartId         string `json:"part_id"`
+	PartURI        string `json:"part_uri"` // temporary, can be derived
+	MachineAPIName string `json:"mach_api_name"`
+	MachineAPIKey  string `json:"mach_api_key"`
 }
 
-var Config config
+type Config struct {
+	Parts      []MachineConfig `json:"machines"`
+	AppAPIName string          `json:"app_api_name"`
+	AppAPIKey  string          `json:"app_api_key"`
+}
+
+var Conf Config
+var App *rpc.ClientConn
 
 func main() {
 	logger := golog.NewDevelopmentLogger("client")
@@ -38,27 +46,37 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	logger.Infof("Loaded config file with secrets: %+v", Config)
+	logger.Infof("Loaded config file with secrets: %+v", Conf)
 
-	for i := 0; i < 6; i++ {
+	ctx := context.Background()
 
-		err = DoAll(logger)
+	App, err = AppClient(ctx, logger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	for i := 0; i < ITERATIONS; i++ {
+		err = DoAll(ctx, Conf.Parts[0], logger)
 		if err != nil {
 			logger.Error(err)
 		}
 
-		time.Sleep(SLEEPTIME + 30*time.Second)
+		// don't sleep on the last iteration
+		if i < ITERATIONS-1 {
+			logger.Info("Sleeping...")
+			time.Sleep(SLEEPTIME + 30*time.Second)
+		}
 	}
 }
 
-func DoAll(logger *zap.SugaredLogger) error {
+func DoAll(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) error {
 	logger.Info("Connecting to 'smart' machine...")
 
-	robot, err := RobotClient(context.Background(), logger, 5)
+	robot, err := RobotClient(ctx, part, logger, 5)
 	if err != nil {
 		return err
 	}
-	defer robot.Close(context.Background())
+	defer robot.Close(ctx)
 
 	logger.Info("Connected")
 
@@ -69,13 +87,16 @@ func DoAll(logger *zap.SugaredLogger) error {
 
 	logger.Infof("Temp: %v", temp)
 
-	err = SendData(context.Background(), map[string]interface{}{"temp": temp}, logger)
+	err = SendData(ctx, part.PartId, map[string]interface{}{"temp": temp}, logger)
 	if err != nil {
 		return err
 	}
 
-	// will hang
-	GoToSleep(robot, 30*time.Second, logger)
+	// will hang + timeout. those errors are handled by the function.
+	err = GoToSleep(ctx, robot, SLEEPTIME, logger)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -86,21 +107,21 @@ func ParseConfig() error {
 		return err
 	}
 
-	if err := json.Unmarshal(configBytes, &Config); err != nil {
+	if err := json.Unmarshal(configBytes, &Conf); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func GoToSleep(robot *client.RobotClient, dur time.Duration, logger *zap.SugaredLogger) error {
-	esp, err := board.FromRobot(robot, "b")
+func GoToSleep(ctx context.Context, robot *client.RobotClient, dur time.Duration, logger *zap.SugaredLogger) error {
+	esp, err := board.FromRobot(robot, "board")
 	if err != nil {
 		return err
 	}
 
 	// short b/c SetPowerMode won't return
-	ctxShortTime, cancl := context.WithTimeout(context.Background(), 2*time.Second)
+	ctxShortTime, cancl := context.WithTimeout(ctx, 2*time.Second)
 	defer cancl()
 	err = esp.SetPowerMode(ctxShortTime, rawboard.PowerMode_POWER_MODE_OFFLINE_DEEP, &dur)
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -112,7 +133,7 @@ func GoToSleep(robot *client.RobotClient, dur time.Duration, logger *zap.Sugared
 }
 
 func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLogger) (float32, error) {
-	esp, err := board.FromRobot(robot, "b")
+	esp, err := board.FromRobot(robot, "board")
 	if err != nil {
 		return 0, err
 	}
@@ -146,7 +167,7 @@ func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLog
 	return temp, nil
 }
 
-func RobotClient(ctx context.Context, logger *zap.SugaredLogger, numRetries int) (*client.RobotClient, error) {
+func RobotClient(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger, numRetries int) (*client.RobotClient, error) {
 	var err error = nil
 
 	for i := 0; i < numRetries; i++ {
@@ -156,17 +177,17 @@ func RobotClient(ctx context.Context, logger *zap.SugaredLogger, numRetries int)
 
 		robot, err = client.New(
 			ctx,
-			"esp-standalone-main.6xs7zv3bxz.viam.cloud",
+			part.PartURI,
 			logger,
 			client.WithDisableSessions(),
 			client.WithReconnectEvery(0),
 			client.WithCheckConnectedEvery(0),
 			client.WithRefreshEvery(0),
 			client.WithDialOptions(rpc.WithEntityCredentials(
-				Config.RobotAPIName,
+				part.MachineAPIName,
 				rpc.Credentials{
 					Type:    rpc.CredentialsTypeAPIKey,
-					Payload: Config.RobotAPIKey,
+					Payload: part.MachineAPIKey,
 				})),
 		)
 
@@ -174,7 +195,7 @@ func RobotClient(ctx context.Context, logger *zap.SugaredLogger, numRetries int)
 			return robot, nil
 		}
 
-		logger.Info("Connection to robot failed, sleep and try again.", err)
+		logger.Info("Connection to machine failed, sleep and try again.", err)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -182,37 +203,31 @@ func RobotClient(ctx context.Context, logger *zap.SugaredLogger, numRetries int)
 }
 
 func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn, error) {
+	logger.Info("Connecting to app")
+
 	conn, err := rpc.DialDirectGRPC(
 		context.Background(),
 		"app.viam.com:443",
 		logger,
 		rpc.WithEntityCredentials(
-			Config.AppAPIName,
+			Conf.AppAPIName,
 			rpc.Credentials{
 				Type:    rpc.CredentialsTypeAPIKey,
-				Payload: Config.AppAPIKey,
+				Payload: Conf.AppAPIKey,
 			}),
 	)
+	logger.Info("Connected")
 
 	return &conn, err
 }
 
-func SendData(ctx context.Context, values map[string]interface{}, logger *zap.SugaredLogger) error {
-
-	logger.Info("Connecting to app")
-	app, err := AppClient(ctx, logger)
-	if err != nil {
-		return err
-	}
-
-	logger.Info("Connected")
+func SendData(ctx context.Context, part_id string, values map[string]interface{}, logger *zap.SugaredLogger) error {
 	data, _ := structpb.NewStruct(map[string]interface{}{"readings": values})
-
-	logger.Info("Data: ", data)
+	logger.Info("Sending data: ", data)
 
 	request := appds.DataCaptureUploadRequest{
 		Metadata: &appds.UploadMetadata{
-			PartId:        "3910b942-5228-4e73-ae09-eb668a5ddb1d",
+			PartId:        part_id,
 			ComponentType: "rdk:component:sensor",
 			ComponentName: "temp",
 			MethodName:    "Readings",
@@ -228,8 +243,8 @@ func SendData(ctx context.Context, values map[string]interface{}, logger *zap.Su
 			}},
 	}
 
-	appclient := appds.NewDataSyncServiceClient(*app)
-	_, err = appclient.DataCaptureUpload(ctx, &request)
+	appclient := appds.NewDataSyncServiceClient(*App)
+	_, err := appclient.DataCaptureUpload(ctx, &request)
 
 	return err
 }
