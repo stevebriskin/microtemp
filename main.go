@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/edaniels/golog"
@@ -21,8 +23,10 @@ import (
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const SLEEPTIME = 2 * time.Minute
-const ITERATIONS = 3
+const SLEEPTIME = 30 * time.Second
+const ITERATIONS = 100000
+
+const NUMREADINGS = 10
 
 type MachineConfig struct {
 	PartId         string `json:"part_id"`
@@ -55,18 +59,32 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	for i := 0; i < ITERATIONS; i++ {
-		err = DoAll(ctx, Conf.Parts[0], logger)
-		if err != nil {
-			logger.Error(err)
-		}
+	var wg sync.WaitGroup
 
-		// don't sleep on the last iteration
-		if i < ITERATIONS-1 {
-			logger.Info("Sleeping...")
-			time.Sleep(SLEEPTIME + 30*time.Second)
+	loop := func(part MachineConfig, logger *zap.SugaredLogger) {
+		defer wg.Done()
+		for i := 0; i < ITERATIONS; i++ {
+			logger.Infof("%v, Reading number %v.", part.PartId, i)
+
+			err = DoAll(ctx, part, logger)
+			if err != nil {
+				logger.Error(err)
+			}
+
+			// don't sleep on the last iteration
+			if i < ITERATIONS-1 {
+				logger.Info("Sleeping...")
+				time.Sleep(SLEEPTIME + 5*time.Second)
+			}
 		}
 	}
+
+	for i, p := range Conf.Parts {
+		wg.Add(1)
+		go loop(p, golog.NewDevelopmentLogger("machine-"+strconv.Itoa(i)))
+	}
+
+	wg.Wait()
 }
 
 func DoAll(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) error {
@@ -80,7 +98,7 @@ func DoAll(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) e
 
 	logger.Info("Connected")
 
-	temp, err := ReadTemp(robot, 20, logger)
+	temp, err := ReadTemp(robot, NUMREADINGS, logger)
 	if err != nil {
 		return err
 	}
