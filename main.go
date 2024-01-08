@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/edaniels/golog"
 	"go.uber.org/zap"
 	rawboard "go.viam.com/api/component/board/v1"
+	"gonum.org/v1/gonum/stat"
 
 	appds "go.viam.com/api/app/datasync/v1"
 
@@ -29,10 +31,11 @@ const ITERATIONS = 100000
 const NUMREADINGS = 10
 
 type MachineConfig struct {
-	PartId         string `json:"part_id"`
-	PartURI        string `json:"part_uri"` // temporary, can be derived
-	MachineAPIName string `json:"mach_api_name"`
-	MachineAPIKey  string `json:"mach_api_key"`
+	PartId         string  `json:"part_id"`
+	PartURI        string  `json:"part_uri"` // temporary, can be derived
+	MachineAPIName string  `json:"mach_api_name"`
+	MachineAPIKey  string  `json:"mach_api_key"`
+	TempCorrection float64 `json:"temp_offset_c,omitempty"`
 }
 
 type Config struct {
@@ -99,6 +102,7 @@ func DoAll(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) e
 	logger.Info("Connected")
 
 	temp, err := ReadTemp(robot, NUMREADINGS, logger)
+	temp += part.TempCorrection
 	if err != nil {
 		return err
 	}
@@ -150,7 +154,7 @@ func GoToSleep(ctx context.Context, robot *client.RobotClient, dur time.Duration
 	return err
 }
 
-func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLogger) (float32, error) {
+func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLogger) (float64, error) {
 	esp, err := board.FromRobot(robot, "board")
 	if err != nil {
 		return 0, err
@@ -161,8 +165,7 @@ func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLog
 		return 0, errors.New("no analog reader 'temp' found")
 	}
 
-	var sum float32
-	var numRealReadings int
+	var readings []float64
 	for i := 0; i < numReadings; i++ {
 		reading, err := analog.Read(context.Background(), nil)
 		if err != nil {
@@ -170,18 +173,24 @@ func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLog
 			continue
 		}
 
-		t := float32(reading-500) / 10.0
+		t := float64(reading-500) / 10.0
 		logger.Debugf("%v: temp: %f", i, t)
-		sum += t
-		numRealReadings++
+		readings = append(readings, t)
 		time.Sleep(10 * time.Millisecond)
 	}
-	// proxy for no readings
-	if sum == 0 {
+
+	if len(readings) == 0 {
 		return 0, errors.New("no temp readings received")
 	}
 
-	temp := sum / float32(numRealReadings)
+	// got enough readings, discard outlier values as they may be noise
+	if len(readings) > 5 {
+		slices.Sort(readings)
+		sliceoff := len(readings) / 3
+		readings = readings[sliceoff : len(readings)-sliceoff]
+	}
+
+	temp := stat.Mean(readings, nil)
 	return temp, nil
 }
 
