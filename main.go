@@ -101,7 +101,7 @@ func DoAll(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) e
 
 	logger.Info("Connected")
 
-	temp, err := ReadTemp(robot, NUMREADINGS, logger)
+	temp, err := ReadTemp(ctx, robot, NUMREADINGS, logger)
 	temp += part.TempCorrection
 	if err != nil {
 		return err
@@ -154,11 +154,30 @@ func GoToSleep(ctx context.Context, robot *client.RobotClient, dur time.Duration
 	return err
 }
 
-func ReadTemp(robot *client.RobotClient, numReadings int, logger *zap.SugaredLogger) (float64, error) {
+func ReadTemp(ctx context.Context, robot *client.RobotClient, numReadings int, logger *zap.SugaredLogger) (float64, error) {
 	esp, err := board.FromRobot(robot, "board")
 	if err != nil {
 		return 0, err
 	}
+
+	// turn on the power pin
+	pin, err := esp.GPIOPinByName("12")
+	if err != nil {
+		return 0, err
+	}
+
+	// don't care about prior state, just need it high now
+	err = pin.Set(ctx, true, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		// ignore error, inconsequential
+		_ = pin.Set(ctx, false, nil)
+	}()
+
+	//sleep for a bit to let the voltage stabilize
+	time.Sleep(time.Second)
 
 	analog, exists := esp.AnalogReaderByName("temp")
 	if !exists {
