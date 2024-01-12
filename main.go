@@ -25,7 +25,7 @@ import (
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const SLEEPTIME = 30 * time.Second
+const SLEEPTIME = 180 * time.Second
 const ITERATIONS = 100000
 
 const NUMREADINGS = 10
