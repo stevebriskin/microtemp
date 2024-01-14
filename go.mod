@@ -1,4 +1,4 @@
-module esptemp
+module microtemp
 
 go 1.20
 
