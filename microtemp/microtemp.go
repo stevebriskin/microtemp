@@ -62,6 +62,7 @@ func DoAll(ctx context.Context, logger *zap.SugaredLogger) {
 	for i, part := range conf.Parts {
 		wg.Add(1)
 		p := part
+		i := i
 		go func() {
 			defer wg.Done()
 			err := DoOne(ctx, p, golog.NewDevelopmentLogger("machine-"+strconv.Itoa(i)))
@@ -75,15 +76,11 @@ func DoAll(ctx context.Context, logger *zap.SugaredLogger) {
 }
 
 func DoOne(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) error {
-	logger.Info("Connecting to 'smart' machine...")
-
 	robot, err := RobotClient(ctx, part, logger, 5)
 	if err != nil {
 		return err
 	}
 	defer robot.Close(ctx)
-
-	logger.Info("Connected to machine.")
 
 	numReadings := 10
 	if conf.NumSensorReadings > 0 {
@@ -193,6 +190,7 @@ func ReadTemp(ctx context.Context, robot *client.RobotClient, numReadings int, l
 
 func RobotClient(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger, numRetries int) (*client.RobotClient, error) {
 	var err error = nil
+	logger.Info("Connecting to 'smart' machine: ", part.PartId)
 
 	for i := 0; i < numRetries; i++ {
 		var robot *client.RobotClient
@@ -220,8 +218,10 @@ func RobotClient(ctx context.Context, part MachineConfig, logger *zap.SugaredLog
 		}
 
 		logger.Info("Connection to machine failed, sleep and try again.", err)
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(i) * time.Second)
 	}
+
+	logger.Info("Connected to machine.")
 
 	return nil, err
 }
@@ -230,7 +230,7 @@ func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn,
 	logger.Info("Connecting to app")
 
 	conn, err := rpc.DialDirectGRPC(
-		context.Background(),
+		ctx,
 		"app.viam.com:443",
 		logger,
 		rpc.WithEntityCredentials(
@@ -240,14 +240,14 @@ func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn,
 				Payload: conf.AppAPIKey,
 			}),
 	)
-	logger.Info("Connected")
+	logger.Info("Connected to app")
 
 	return &conn, err
 }
 
 func SendData(ctx context.Context, part_id string, values map[string]interface{}, logger *zap.SugaredLogger) error {
 	data, _ := structpb.NewStruct(map[string]interface{}{"readings": values})
-	logger.Info("Sending data: ", data)
+	logger.Info("Sending data to app: ", data)
 
 	request := appds.DataCaptureUploadRequest{
 		Metadata: &appds.UploadMetadata{
