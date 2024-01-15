@@ -8,6 +8,7 @@ require (
 	go.viam.com/api v0.1.227
 	go.viam.com/rdk v0.15.1
 	go.viam.com/utils v0.1.54
+	gonum.org/v1/gonum v0.12.0
 	google.golang.org/protobuf v1.31.0
 )
 
@@ -126,7 +127,6 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	gonum.org/v1/gonum v0.12.0 // indirect
 	gonum.org/v1/plot v0.12.0 // indirect
 	google.golang.org/api v0.126.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

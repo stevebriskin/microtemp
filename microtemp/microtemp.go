@@ -59,8 +59,9 @@ func Initialize(ctx context.Context, c Config, logger *zap.SugaredLogger) error 
 func DoAll(ctx context.Context, logger *zap.SugaredLogger) {
 	var wg sync.WaitGroup
 
-	for i, p := range conf.Parts {
+	for i, part := range conf.Parts {
 		wg.Add(1)
+		p := part
 		go func() {
 			defer wg.Done()
 			err := DoOne(ctx, p, golog.NewDevelopmentLogger("machine-"+strconv.Itoa(i)))
@@ -82,7 +83,7 @@ func DoOne(ctx context.Context, part MachineConfig, logger *zap.SugaredLogger) e
 	}
 	defer robot.Close(ctx)
 
-	logger.Info("Connected")
+	logger.Info("Connected to machine.")
 
 	numReadings := 10
 	if conf.NumSensorReadings > 0 {
@@ -176,6 +177,8 @@ func ReadTemp(ctx context.Context, robot *client.RobotClient, numReadings int, l
 		return 0, errors.New("no temp readings received")
 	}
 
+	logger.Infof("All readings: %v", readings)
+
 	// got enough readings, discard outlier values as they may be noise
 	if len(readings) > 5 {
 		slices.Sort(readings)
@@ -184,6 +187,7 @@ func ReadTemp(ctx context.Context, robot *client.RobotClient, numReadings int, l
 	}
 
 	temp := stat.Mean(readings, nil)
+	logger.Infof("Mean of readings %v: %v", readings, temp)
 	return temp, nil
 }
 

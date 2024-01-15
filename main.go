@@ -31,19 +31,21 @@ func main() {
 
 	for i := 0; i < ITERATIONS; i++ {
 		logger.Infof("Reading number %v.", i)
-
 		microtemp.DoAll(ctx, logger)
 
-		// don't sleep on the last iteration
-		if i < ITERATIONS-1 {
-			logger.Info("Sleeping...")
-			time.Sleep(time.Duration(conf.SleepTime)*time.Second + 5*time.Second)
-		}
+		// inefficient: only starts sleep after last machine is done, not per machine. push logic down.
+		logger.Info("Sleeping...")
+		time.Sleep(time.Duration(conf.SleepTime) * time.Second)
 	}
 }
 
 func ParseConfig(conf *microtemp.Config) error {
-	configBytes, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".viam", "temperatureconfig"))
+	fileName := os.Getenv("CONFIG")
+	if fileName == "" {
+		fileName = filepath.Join(os.Getenv("HOME"), ".viam", "temperatureconfig")
+	}
+
+	configBytes, err := os.ReadFile(fileName)
 	if err != nil {
 		return err
 	}
