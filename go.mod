@@ -1,4 +1,4 @@
-module microtemp
+module github.com/stevebriskin/microtemp
 
 go 1.20
 

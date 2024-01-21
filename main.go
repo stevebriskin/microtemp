@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"microtemp/microtemp"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/stevebriskin/microtemp/microtemp"
 
 	"github.com/edaniels/golog"
 )
