@@ -52,8 +52,15 @@ func Initialize(ctx context.Context, c Config, logger *zap.SugaredLogger) error 
 	if err != nil {
 		return err
 	}
+
 	app = a
 	return nil
+}
+
+func Close() {
+	if app != nil {
+		(*app).Close()
+	}
 }
 
 func DoAll(ctx context.Context, logger *zap.SugaredLogger) {

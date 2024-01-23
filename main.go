@@ -29,6 +29,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+	defer microtemp.Close()
 
 	for i := 0; i < ITERATIONS; i++ {
 		logger.Infof("Reading number %v.", i)
