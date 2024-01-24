@@ -120,9 +120,10 @@ func GoToSleep(ctx context.Context, robot *client.RobotClient, dur time.Duration
 	if err != nil {
 		return err
 	}
+	defer esp.Close(ctx)
 
 	// short b/c SetPowerMode won't return
-	ctxShortTime, cancl := context.WithTimeout(ctx, 2*time.Second)
+	ctxShortTime, cancl := context.WithTimeout(ctx, 5*time.Second)
 	defer cancl()
 	err = esp.SetPowerMode(ctxShortTime, rawboard.PowerMode_POWER_MODE_OFFLINE_DEEP, &dur)
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -138,6 +139,7 @@ func ReadTemp(ctx context.Context, robot *client.RobotClient, numReadings int, l
 	if err != nil {
 		return 0, err
 	}
+	defer esp.Close(ctx)
 
 	// turn on the power pin
 	pin, err := esp.GPIOPinByName("12")
@@ -221,14 +223,14 @@ func RobotClient(ctx context.Context, part MachineConfig, logger *zap.SugaredLog
 		)
 
 		if err == nil {
+			logger.Info("Connected to machine.")
 			return robot, nil
 		}
 
 		logger.Info("Connection to machine failed, sleep and try again.", err)
 		time.Sleep(time.Duration(i) * time.Second)
 	}
-
-	logger.Info("Connected to machine.")
+	logger.Warn("Failed to connect to machine.")
 
 	return nil, err
 }
