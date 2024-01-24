@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/edaniels/golog"
 	"go.uber.org/zap"
 	rawboard "go.viam.com/api/component/board/v1"
 	"gonum.org/v1/gonum/stat"
@@ -72,7 +71,7 @@ func DoAll(ctx context.Context, logger *zap.SugaredLogger) {
 		i := i
 		go func() {
 			defer wg.Done()
-			err := DoOne(ctx, p, golog.NewDevelopmentLogger("machine-"+strconv.Itoa(i)))
+			err := DoOne(ctx, p, logger.Named("machine-"+strconv.Itoa(i)))
 			if err != nil {
 				logger.Error(err)
 			}
