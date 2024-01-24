@@ -278,6 +278,5 @@ func SendData(ctx context.Context, part_id string, values map[string]interface{}
 
 	appclient := appds.NewDataSyncServiceClient(*app)
 	_, err := appclient.DataCaptureUpload(ctx, &request)
-appclient.Close()
 	return err
 }
