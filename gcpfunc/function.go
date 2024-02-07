@@ -14,6 +14,10 @@ import (
 	"github.com/edaniels/golog"
 )
 
+/*
+   This is an example of what a Google Cloud Function may look like.
+*/
+
 //go:embed testconfig.json
 var CONFIG_BYTES []byte
 var conf microtemp.Config

@@ -13,12 +13,20 @@ require (
 )
 
 require (
+	github.com/cloudevents/sdk-go/v2 v2.14.0 // indirect
+	github.com/json-iterator/go v1.1.10 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.1 // indirect
+)
+
+require (
 	cloud.google.com/go v0.110.4 // indirect
 	cloud.google.com/go/compute v1.21.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.1 // indirect
 	cloud.google.com/go/storage v1.30.1 // indirect
 	git.sr.ht/~sbinet/gg v0.3.1 // indirect
+	github.com/GoogleCloudPlatform/functions-framework-go v1.8.0
 	github.com/a8m/envsubst v1.4.2 // indirect
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/alecthomas/participle/v2 v2.0.0-alpha3 // indirect

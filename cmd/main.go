@@ -12,7 +12,7 @@ import (
 	"github.com/edaniels/golog"
 )
 
-const ITERATIONS = 100000
+const ITERATIONS = 100
 
 func main() {
 	logger := golog.NewDevelopmentLogger("client")
