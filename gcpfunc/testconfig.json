@@ -1,0 +1,14 @@
+{
+    "machines" : [
+    {
+            "part_id" : "",
+            "part_uri": "",
+            "mach_api_name" : "",
+            "mach_api_key" : "",
+            "temp_offset_c": 0
+    }],
+    "app_api_name" : "",
+    "app_api_key" : "",
+    "sleep_time" : 5,
+    "num_sensor_readings" : 20
+}
