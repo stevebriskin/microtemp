@@ -1,4 +1,4 @@
-package main
+package hvac
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/edaniels/golog"
 	"github.com/stevebriskin/microtemp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.uber.org/zap"
@@ -47,23 +46,11 @@ type Config struct {
 	HvacAPIKey  string `json:"hvac_api_key"`
 }
 
-//go:embed config.json
-var CONFIG_BYTES []byte
-var conf Config
+var Conf Config
 
-func main() {
-	logger := golog.NewDebugLogger("client")
-	ctx := context.Background()
-
-	parseConfig(&conf)
-	logger.Infof("Config: %+v", conf)
-
-	doStuff(ctx, logger)
-}
-
-func doStuff(ctx context.Context, logger *zap.SugaredLogger) {
+func DoStuff(ctx context.Context, logger *zap.SugaredLogger) {
 	// TODO: parallelize
-	for _, zone := range conf.Zones {
+	for _, zone := range Conf.Zones {
 		temp, err := getAverageTempFromApp(ctx, zone.TempMachines, logger)
 		if err != nil {
 			logger.Error(err)
@@ -96,8 +83,8 @@ func computeHvacState(hvacMode string, sensorTemp float64, desiredTemp float64) 
 	return true
 }
 
-func parseConfig(conf *Config) error {
-	if err := json.Unmarshal(CONFIG_BYTES, conf); err != nil {
+func ParseConfig(configbytes []byte, conf *Config) error {
+	if err := json.Unmarshal(configbytes, conf); err != nil {
 		return err
 	}
 
@@ -110,10 +97,10 @@ func toggleHVACSwitch(ctx context.Context, uri string, on bool, logger *zap.Suga
 		uri,
 		logger,
 		client.WithDialOptions(rpc.WithEntityCredentials(
-			conf.HvacAPIName,
+			Conf.HvacAPIName,
 			rpc.Credentials{
 				Type:    rpc.CredentialsTypeAPIKey,
-				Payload: conf.HvacAPIKey,
+				Payload: Conf.HvacAPIKey,
 			})),
 	)
 	if err != nil {
@@ -136,7 +123,7 @@ func toggleHVACSwitch(ctx context.Context, uri string, on bool, logger *zap.Suga
 
 func getAverageTempFromApp(ctx context.Context, machines []string, logger *zap.SugaredLogger) (float64, error) {
 
-	conn, err := microtemp.AppClient(ctx, conf.AppAPIName, conf.AppAPIKey, logger)
+	conn, err := microtemp.AppClient(ctx, Conf.AppAPIName, Conf.AppAPIKey, logger)
 	if err != nil {
 		return 0, err
 	}
@@ -145,7 +132,7 @@ func getAverageTempFromApp(ctx context.Context, machines []string, logger *zap.S
 	appclient := appd.NewDataServiceClient(*conn)
 
 	matchStage := bson.M{"$match": bson.M{
-		"organization_id": conf.AppOrganizationId,
+		"organization_id": Conf.AppOrganizationId,
 		"component_name":  "temp",
 		"method_name":     "Readings",
 		"robot_id":        bson.M{"$in": machines},
@@ -162,7 +149,7 @@ func getAverageTempFromApp(ctx context.Context, machines []string, logger *zap.S
 	groupStageBSON, _ := bson.Marshal(groupStage)
 
 	request := appd.TabularDataByMQLRequest{
-		OrganizationId: conf.AppOrganizationId,
+		OrganizationId: Conf.AppOrganizationId,
 		MqlBinary:      [][]byte{matchStageBSON, groupStageBSON},
 	}
 
