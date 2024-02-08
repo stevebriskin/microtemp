@@ -1,0 +1,14 @@
+{
+    "machines" : [
+    {
+            "part_id" : "3910b94...",
+            "part_uri": "esp-main.viam.cloud",
+            "mach_api_name" : "",
+            "mach_api_key" : "",
+            "temp_offset_c": 0
+    }],
+    "app_api_name" : "sasdf-332-dsfa",
+    "app_api_key" : "ydasfrmoy3b7o7j",
+    "sleep_time" : 300,
+    "num_sensor_readings" : 20
+}

@@ -29,6 +29,7 @@ type MachineConfig struct {
 	TempCorrection float64 `json:"temp_offset_c,omitempty"`
 }
 
+// TODO: Get all part info from app.viam.com with a single highly scope API key
 type Config struct {
 	Parts      []MachineConfig `json:"machines"`
 	AppAPIName string          `json:"app_api_name"`
@@ -47,7 +48,7 @@ var app *rpc.ClientConn
 func Initialize(ctx context.Context, c Config, logger *zap.SugaredLogger) error {
 	conf = c
 
-	a, err := AppClient(ctx, logger)
+	a, err := AppClient(ctx, conf.AppAPIName, conf.AppAPIKey, logger)
 	if err != nil {
 		return err
 	}
@@ -234,7 +235,7 @@ func RobotClient(ctx context.Context, part MachineConfig, logger *zap.SugaredLog
 	return nil, err
 }
 
-func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn, error) {
+func AppClient(ctx context.Context, apiKeyName string, apiKey string, logger *zap.SugaredLogger) (*rpc.ClientConn, error) {
 	logger.Info("Connecting to app")
 
 	conn, err := rpc.DialDirectGRPC(
@@ -242,10 +243,10 @@ func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn,
 		"app.viam.com:443",
 		logger,
 		rpc.WithEntityCredentials(
-			conf.AppAPIName,
+			apiKeyName,
 			rpc.Credentials{
 				Type:    rpc.CredentialsTypeAPIKey,
-				Payload: conf.AppAPIKey,
+				Payload: apiKey,
 			}),
 	)
 	logger.Info("Connected to app")
@@ -253,6 +254,7 @@ func AppClient(ctx context.Context, logger *zap.SugaredLogger) (*rpc.ClientConn,
 	return &conn, err
 }
 
+// Send data to the data sync service in liu of the data capture service
 func SendData(ctx context.Context, part_id string, values map[string]interface{}, logger *zap.SugaredLogger) error {
 	data, _ := structpb.NewStruct(map[string]interface{}{"readings": values})
 	logger.Info("Sending data to app: ", data)
